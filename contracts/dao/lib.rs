@@ -9,18 +9,29 @@ pub mod dao {
         Encode,
     };
 
+    // Consts.
+    const ONE_MINUTE: u64 = 60;
+
+    // Types.
+    type ProposalId = u64;
+
+    // Enums.
     #[derive(Encode, Decode)]
     #[cfg_attr(feature = "std", derive(Debug, PartialEq, Eq, scale_info::TypeInfo))]
     pub enum VoteType {
-        // to implement
+        Positive,
+        Negative
     }
 
     #[derive(Copy, Clone, Debug, PartialEq, Eq, Encode, Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum GovernorError {
-        // to implement
+        AmountShouldNotBeZero,
+        DurationError,
+        QuorumNotReached
     }
 
+    // Structs.
     #[derive(Encode, Decode)]
     #[cfg_attr(
         feature = "std",
@@ -33,7 +44,13 @@ pub mod dao {
         )
     )]
     pub struct Proposal {
-        // to implement
+        to: AccountId,
+        amount: Balance,
+        vote_start: u64,
+        vote_end: u64,
+        executed: bool
+        vote: ProposalVote,
+        histories: Mapping<AccountId, bool>
     }
 
     #[derive(Encode, Decode, Default)]
@@ -48,18 +65,23 @@ pub mod dao {
         )
     )]
     pub struct ProposalVote {
-        // to implement
+        positive: Balance,
+        negative: Balance
     }
 
     #[ink(storage)]
     pub struct Governor {
-        // to implement
+        proposals: Mapping<u64, Proposal>,
+        proposal_counter: ProposalId
     }
 
     impl Governor {
         #[ink(constructor, payable)]
         pub fn new(governance_token: AccountId, quorum: u8) -> Self {
-            unimplemented!()
+            Self {
+                proposals: Mapping::new()
+                proposal_counter: 0
+            }
         }
 
         #[ink(message)]
@@ -69,7 +91,24 @@ pub mod dao {
             amount: Balance,
             duration: u64,
         ) -> Result<(), GovernorError> {
-            unimplemented!()
+            if (amount <= 0) 
+                return Err(GovernorError::AmountShouldNotBeZero)
+            if (duration <= 0) 
+                return Err(GovernorError::DurationError)
+
+            let proposal = Proposal {
+                to,
+                amount,
+                vote_start: self.env().block_timestamp(),
+                vote_end: self.env().block_timestamp() + (ONE_MINUTE * duration),
+                executed: false,
+                histories: Mapping::new()
+            };
+            self.proposals.insert(self.next_proposal_id, &proposal);
+
+            self.next_proposal_id++;
+
+            Ok(())
         }
 
         #[ink(message)]
@@ -78,7 +117,16 @@ pub mod dao {
             proposal_id: ProposalId,
             vote: VoteType,
         ) -> Result<(), GovernorError> {
-            unimplemented!()
+            if (amount < 0) 
+                return Err(GovernorError::ProposalNotFound)
+
+            let proposal = self
+                .proposals
+                .get(&proposal_id)
+                .ok_or(GovernorError::ProposalNotFound)?;
+
+
+
         }
 
         #[ink(message)]
